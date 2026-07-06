@@ -85,6 +85,12 @@ jobs:
           file: './alarm-panel-3w.yaml'
           key-path: '["substitutions", "project_version"]'
 
+      - id: alarm-panel-pico-version
+        uses: konnected-io/read-yaml@main
+        with:
+          file: './alarm-panel-pico.yaml'
+          key-path: '["substitutions", "project_version"]'
+
       - name: Build Alarm Panel ESP8266
         id: build-alarm-panel-esp8266
         run: |
@@ -173,6 +179,17 @@ jobs:
           fname=konnected-esphome-alarm-panel-3w-${{ steps.alarm-panel-3w-version.outputs.data }}.bin
           cp $build_path/firmware.factory.bin assets/$fname
           cp $build_path/firmware.ota.bin assets/${fname%.bin}.ota.bin
+          echo "fname=$fname" >> $GITHUB_OUTPUT
+
+      - name: Build Alarm Panel Pico (RP2040/RP2350)
+        id: build-alarm-panel-pico
+        run: |
+          esphome compile alarm-panel-pico.yaml
+          build_path=.esphome/build/konnected/.pioenvs/konnected
+          # The Pico is flashed via a UF2 factory image (drag-and-drop), not a .bin
+          fname=konnected-esphome-alarm-panel-pico-${{ steps.alarm-panel-pico-version.outputs.data }}.uf2
+          cp $build_path/firmware.factory.uf2 assets/$fname
+          cp $build_path/firmware.ota.bin assets/${fname%.uf2}.ota.bin
           echo "fname=$fname" >> $GITHUB_OUTPUT
 
       - uses: keithweaver/aws-s3-github-action@v1.0.0

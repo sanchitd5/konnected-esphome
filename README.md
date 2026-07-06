@@ -19,6 +19,7 @@ Konnected makes IoT hardware that integrates traditional wired alarm systems and
 | [Garage Door Opener](https://konnected.io/products/smart-garage-door-opener) | GDOv1-S | ESP8266 | WiFi | [`garage-door-GDOv1-S.yaml`](garage-door-GDOv1-S.yaml) |
 | [Garage Door Opener](https://konnected.io/products/smart-garage-door-opener) | GDOv2-S | ESP32-S3 | WiFi | [`garage-door-GDOv2-S.yaml`](garage-door-GDOv2-S.yaml) |
 | [GDO blaQ](https://konnected.io/products/smart-garage-door-opener-blaq-myq-alternative) | GDOv2-Q | ESP32-S3 | WiFi | [`garage-door-GDOv2-Q.yaml`](garage-door-GDOv2-Q.yaml) |
+| Alarm Panel (DIY, 12-zone) | Raspberry Pi Pico 2 W / Pico W | RP2350 / RP2040 | WiFi | [`alarm-panel-pico.yaml`](alarm-panel-pico.yaml) |
 
 > **Which Alarm Panel Pro ethernet config?** Check the hardware version printed on the front of the device beneath the logo. Use `alarm-panel-pro-esp32-ethernet.yaml` for v1.5, v1.6, and v1.7. Use `alarm-panel-pro-v1.8-ethernet.yaml` for v1.8 and newer. These are separate config files — no manual variable editing is needed.
 
@@ -77,6 +78,19 @@ Same as above but connected via Ethernet using the **LAN8720** PHY. Use this con
 Alarm Panel Pro **v1.8 and newer** uses the **RTL8201** PHY and requires this dedicated config file. It also applies a `phy_registers` workaround for a known hardware issue in the 2406 production batch. This workaround is harmless on newer batches (2408+).
 
 - **Default packages:** same as above, with RTL8201 Ethernet driver and PHY register fix
+
+---
+
+### Alarm Panel (Raspberry Pi Pico) — `alarm-panel-pico.yaml`
+
+A DIY 12-zone alarm panel that runs on a **Raspberry Pi Pico 2 W (RP2350)** or the original **Pico W (RP2040)**. There is no Konnected PCB for this board; it targets the bare Pico headers, so the GPIO/zone mapping is generic and meant to be edited to match your wiring.
+
+- **Board select:** the `rp2040_board` substitution chooses the target — `rpipico2w` (default, RP2350) or `rpipicow` (RP2040). Both require the CYW43439 WiFi chip.
+- **Toolchain:** RP2350 needs **ESPHome 2026.3.0+** (arduino-pico 5.x / pico-sdk 2.x); the Pico W builds on any recent ESPHome.
+- **Zones:** 12 input zones (`zone1`–`zone12`) + 2 alarm outputs (`alarm1`, `alarm2`) + 2 auxiliary outputs (`out1`, `out2`)
+- **Default packages:** core-rp2040, WiFi (serial Improv, no BLE), mDNS, status LED, zones 1–12, warning beep. Alarm output switches are defined inline (the shared alarm packages use the ESP32-only `ignore_strapping_warning` pin option).
+- **Flashing:** the build produces a **UF2** factory image (drag-and-drop onto the Pico's `RPI-RP2` mass-storage volume); subsequent updates use OTA.
+- **Notes / limitations:** the onboard LED is wired to the CYW43 chip rather than a normal GPIO; arduino-pico exposes it as pin `GPIO64` (`LED_BUILTIN`) on both boards, so `status_led` drives the onboard LED. `GP0`/`GP1` are reserved for the serial console. `captive_portal` and `web_server` on this platform require ESPHome 2026.3.0+.
 
 ---
 
@@ -305,6 +319,7 @@ This is the recommended way to customize zones. A complete real-world example is
 | `core-esp32.yaml` | Required base for all ESP32 devices: device identity, OTA updates, uptime sensor, restart button. |
 | `core-esp32-s3.yaml` | Same as above, for ESP32-S3. |
 | `core-esp8266.yaml` | Same as above, for ESP8266. |
+| `core-rp2040.yaml` | Same as above, for Raspberry Pi Pico W (RP2040) / Pico 2 W (RP2350); board selected via `rp2040_board`. |
 
 #### Connectivity
 

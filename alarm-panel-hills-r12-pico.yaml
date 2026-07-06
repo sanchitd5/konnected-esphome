@@ -1,0 +1,96 @@
+####
+##
+## Hills Reliance R12 -> Raspberry Pi Pico 2 W conversion (3 zones)
+## Reads the existing wired alarm zones and hands all arming/siren logic to Home Assistant.
+##
+## filename: alarm-panel-hills-r12-pico.yaml
+##
+## WIRING (see notes at bottom):
+##   - Leave the Hills panel powered; reuse it as a 12V PSU + battery backup for the PIRs.
+##   - Tie Pico GND to the Hills COM terminal (shared reference, mandatory).
+##   - Each Hills ZONE loop (contact + 3.3K EOL to COM) -> a Pico GPIO below.
+##   - Do NOT connect AUX+ / BELL / any 12V to a GPIO. Zone + COM only.
+##
+####
+
+substitutions:
+  ####
+  # NAME
+  name: konnected
+  friendly_name: Hills Alarm
+  project_name: konnected.alarm-panel-hills-r12-pico
+  project_version: "1.0.0"
+
+  ####
+  # BOARD  (rpipico2w = Pico 2 W / RP2350; rpipicow = Pico W / RP2040)
+  rp2040_board: rpipico2w
+
+  sensor_debounce_time: 200ms
+  blink_on_state: "true"
+  status_led_inverted: "false"
+
+  ####
+  # ZONE MAPPING  (Hills ZONE terminal -> Pico GPIO)
+  # GP0/GP1 reserved for the serial console. Onboard LED is GPIO64.
+  zone1: GPIO2   # Hills ZONE 1
+  zone2: GPIO3   # Hills ZONE 2
+  zone3: GPIO4   # Hills ZONE 3
+  status_led: GPIO64
+
+####
+# PACKAGES
+packages:
+
+  remote_package:
+    url: https://github.com/konnected-io/konnected-esphome
+    ref: master
+    refresh: 5min
+    files:
+      # CORE (rp2040/rp2350 base: identity, OTA, uptime, restart)
+      - packages/core-rp2040.yaml
+      # WIFI (serial Improv, no BLE)
+      - packages/wifi.yaml
+      # MDNS (_konnected service advertisement)
+      - packages/mdns.yaml
+      # STATUS LED (onboard CYW43 LED, GPIO64)
+      - packages/status-led.yaml
+      # INPUT ZONES (only the 3 in use)
+      - packages/alarm-panel/zone1.yaml
+      - packages/alarm-panel/zone2.yaml
+      - packages/alarm-panel/zone3.yaml
+
+####
+# ZONE LABELS / DEVICE CLASSES
+# All 3 zones are PIR motion detectors. Rename to your rooms as desired.
+# Hills PIRs are wired N.C. (secure = closed); if a zone reads inverted,
+# add `filters: [invert:]` to that binary_sensor.
+binary_sensor:
+  - id: !extend zone1
+    name: "Motion Zone 1"
+    device_class: motion
+  - id: !extend zone2
+    name: "Motion Zone 2"
+    device_class: motion
+  - id: !extend zone3
+    name: "Motion Zone 3"
+    device_class: motion
+
+dashboard_import:
+  package_import_url: github://konnected-io/konnected-esphome/alarm-panel-hills-r12-pico.yaml@master
+  import_full_config: false
+
+####
+# WEB SERVER
+web_server:
+  include_internal: true
+
+####
+# LOGGER
+logger:
+
+####
+# NATIVE API for HOME ASSISTANT
+# Home Assistant is the brain: zones are exposed as binary sensors; arming,
+# entry/exit delay, and siren logic all live in HA automations / the
+# alarm_control_panel integration.
+api:
