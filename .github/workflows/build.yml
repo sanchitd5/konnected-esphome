@@ -91,6 +91,12 @@ jobs:
           file: './alarm-panel-pico.yaml'
           key-path: '["substitutions", "project_version"]'
 
+      - id: alarm-panel-hills-r12-pico-version
+        uses: konnected-io/read-yaml@main
+        with:
+          file: './alarm-panel-hills-r12-pico.yaml'
+          key-path: '["substitutions", "project_version"]'
+
       - name: Build Alarm Panel ESP8266
         id: build-alarm-panel-esp8266
         run: |
@@ -188,6 +194,16 @@ jobs:
           build_path=.esphome/build/konnected/.pioenvs/konnected
           # The Pico is flashed via a UF2 factory image (drag-and-drop), not a .bin
           fname=konnected-esphome-alarm-panel-pico-${{ steps.alarm-panel-pico-version.outputs.data }}.uf2
+          cp $build_path/firmware.factory.uf2 assets/$fname
+          cp $build_path/firmware.ota.bin assets/${fname%.uf2}.ota.bin
+          echo "fname=$fname" >> $GITHUB_OUTPUT
+
+      - name: Build Alarm Panel Hills R12 (Pico)
+        id: build-alarm-panel-hills-r12-pico
+        run: |
+          esphome compile alarm-panel-hills-r12-pico.yaml
+          build_path=.esphome/build/hills-alarm/.pioenvs/hills-alarm
+          fname=konnected-esphome-alarm-panel-hills-r12-pico-${{ steps.alarm-panel-hills-r12-pico-version.outputs.data }}.uf2
           cp $build_path/firmware.factory.uf2 assets/$fname
           cp $build_path/firmware.ota.bin assets/${fname%.uf2}.ota.bin
           echo "fname=$fname" >> $GITHUB_OUTPUT

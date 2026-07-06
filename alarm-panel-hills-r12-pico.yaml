@@ -71,8 +71,8 @@ substitutions:
 packages:
 
   remote_package:
-    url: https://github.com/konnected-io/konnected-esphome
-    ref: master
+    url: https://github.com/sanchitd5/konnected-esphome
+    ref: add-rp2040-pico-support
     refresh: 5min
     files:
       # CORE (rp2040/rp2350 base: identity, OTA, uptime, restart)
@@ -149,7 +149,7 @@ binary_sensor:
       lower: 1.05
 
 dashboard_import:
-  package_import_url: github://konnected-io/konnected-esphome/alarm-panel-hills-r12-pico.yaml@master
+  package_import_url: github://sanchitd5/konnected-esphome/alarm-panel-hills-r12-pico.yaml@add-rp2040-pico-support
   import_full_config: false
 
 ####
