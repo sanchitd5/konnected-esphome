@@ -1,0 +1,179 @@
+####
+##
+## Konnected Alarm Panel (Raspberry Pi Pico 2 W / Pico W)
+## Firmware configuration for ESPHome
+##
+## filename: alarm-panel-pico.yaml
+## GitHub: https://github.com/konnected-io/konnected-esphome
+## Buy Konnected hardware: https://konnected.io
+## Help & Support: https://help@konnected.io (support is provided for purchasers of Konnected hardware)
+##
+## Copyright© 2023 Konnected Inc.
+##
+## Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
+## files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
+## modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software
+## is furnished to do so, subject to the following conditions:
+##
+## The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+## OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+## LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+## IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+####
+
+####
+# GENERAL SETTINGS
+# Customize these variables to your preferences and needs
+# more: https://esphome.io/guides/configuration-types.html#substitutions
+substitutions:
+
+  ####
+  # NAME
+  # By default, the name of the ESPHome device is "konnected-xxxxxx" where xxxxxx is a unique identifier. The device's
+  # hostname on your network is also defined by the name, defaulting to "konnected-xxxxxx.local". Edit this variable to
+  # customize the name and hostname. Note: only lowercase characters, numbers and hyphen(-) are allowed.
+  name: konnected
+  friendly_name: Alarm Panel
+  project_name: konnected.alarm-panel-pico
+  project_version: "1.0.0"
+
+  ####
+  # BOARD
+  # Selects the target Raspberry Pi Pico board. Both use the CYW43439 WiFi chip.
+  #   - rpipico2w  -> Raspberry Pi Pico 2 W (RP2350)  [default; requires ESPHome 2026.3.0+]
+  #   - rpipicow   -> Raspberry Pi Pico W   (RP2040)
+  # To flash a Pico W instead, change this to rpipicow.
+  rp2040_board: rpipico2w
+
+  sensor_debounce_time: 200ms
+  warning_beep_pulse_time: 100ms
+  warning_beep_pause_time: 130ms
+  warning_beep_internal_only: "false"
+  warning_beep_shared: "false"
+  blink_on_state: "true"
+
+  ####
+  # ZONE MAPPING
+  # These are generic Pico header GPIOs (there is no Konnected PCB for this board).
+  # GP0/GP1 are reserved for the serial console. Edit to suit your wiring.
+  zone1: GPIO2
+  zone2: GPIO3
+  zone3: GPIO4
+  zone4: GPIO5
+  zone5: GPIO6
+  zone6: GPIO7
+  zone7: GPIO8
+  zone8: GPIO9
+  zone9: GPIO10
+  zone10: GPIO11
+  zone11: GPIO12
+  zone12: GPIO13
+  alarm1: GPIO14
+  alarm2: GPIO15
+  out1: GPIO16
+  out2: GPIO17
+  # Onboard LED. On the Pico W / Pico 2 W it is wired to the CYW43 WiFi chip, not
+  # to a normal RP2040/RP2350 GPIO. The arduino-pico framework exposes it as pin
+  # GPIO64 (== LED_BUILTIN) on both boards, so status_led drives the onboard LED.
+  status_led: GPIO64
+
+  ####
+  # CONNECTION MAPPINGS
+  warning_beep_pin: $out1
+
+####
+# PACKAGES
+# Each package includes an alarm panel feature.
+# Remove or comment out any packages that you do not need or want.
+packages:
+
+  remote_package:
+    url: https://github.com/sanchitd5/konnected-esphome
+    ref: add-rp2040-pico-support
+    refresh: 5min
+    files:
+
+      ####
+      # CORE
+      # This package is required and sets up core features.
+      - packages/core-rp2040.yaml
+
+      ####
+      # WIFI
+      # Enables WiFi connectivity and diagnostics (serial-based Improv, no BLE).
+      - packages/wifi.yaml
+
+      ####
+      # MDNS
+      # Enables the _konnected MDNS/zeroconf service advertisement needed for the Konnected App
+      - packages/mdns.yaml
+
+      ####
+      # STATUS LED
+      # Enables a status LED as an activity/error indicator (external LED, see note above)
+      - packages/status-led.yaml
+
+      ####
+      # INPUT ZONES
+      - packages/alarm-panel/zone1.yaml
+      - packages/alarm-panel/zone2.yaml
+      - packages/alarm-panel/zone3.yaml
+      - packages/alarm-panel/zone4.yaml
+      - packages/alarm-panel/zone5.yaml
+      - packages/alarm-panel/zone6.yaml
+      - packages/alarm-panel/zone7.yaml
+      - packages/alarm-panel/zone8.yaml
+      - packages/alarm-panel/zone9.yaml
+      - packages/alarm-panel/zone10.yaml
+      - packages/alarm-panel/zone11.yaml
+      - packages/alarm-panel/zone12.yaml
+
+      ####
+      # WARNING BEEP
+      # Enables a 'Warning Beep' entity, intended to be used with a piezo buzzer or other pulsing
+      # binary output. Implemented using the light component with strobe effect.
+      - packages/warning-beep.yaml
+
+####
+# OUTPUTS
+# Alarm outputs are defined inline (not via the shared alarm-panel packages) because
+# those packages use the ESP32-only `ignore_strapping_warning` pin option, which is
+# not valid on the rp2040 platform.
+switch:
+  - id: alarm1
+    name: Alarm 1
+    platform: gpio
+    icon: mdi:bullhorn
+    pin:
+      number: $alarm1
+  - id: alarm2
+    name: Alarm 2
+    platform: gpio
+    icon: mdi:bullhorn
+    pin:
+      number: $alarm2
+
+dashboard_import:
+  package_import_url: github://sanchitd5/konnected-esphome/alarm-panel-pico.yaml@add-rp2040-pico-support
+  import_full_config: false
+
+####
+# WEB SERVER
+# Enables the built-in web server for viewing the device state, internals and controls via web browser
+# on the same local network as the device.
+web_server:
+  include_internal: true
+
+####
+# LOGGER
+# more: https://esphome.io/components/logger.html
+logger:
+
+####
+# NATIVE API for HOME ASSISTANT
+# Enables the native API for Home Assistant
+# more: https://esphome.io/components/api.html
+api:

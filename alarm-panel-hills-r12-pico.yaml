@@ -1,0 +1,169 @@
+####
+##
+## Hills Reliance R12 -> Raspberry Pi Pico 2 W conversion (3 zones, analog)
+## Reads the existing wired PIR zones and hands all arming/siren logic to Home Assistant.
+##
+## filename: alarm-panel-hills-r12-pico.yaml
+##
+## -------------------------------------------------------------------------------------
+## ZONE WIRING (analog, keeps the Hills 3.3K EOL resistors)
+## Each zone is a voltage divider read by the Pico ADC:
+##
+##   3V3 (pin 36) --[10K pull-up]--+-- ADCx (GP26/27/28)
+##                                 |
+##                            zone signal wire (blue)
+##                                 |
+##                     [PIR N.C. alarm contact + 3.3K EOL]  (out in the field)
+##                                 |
+##                            return wire (white) --> Hills COM
+##
+##   Pico GND (pin 38) --> Hills COM   (single shared ground, mandatory)
+##
+## Measured levels on an R12: secure ~0.8 V, motion ~1.33 V (the loop is resistive-
+## supervised, it does NOT go fully open). Thresholds below are set for that.
+## Add one 10K pull-up per zone from 3V3; optional 100nF ADC->GND if long runs are noisy.
+## Never let 12 V reach an ADC pin (max 3.3 V). The PIRs get 12 V on a separate pair.
+##
+## -------------------------------------------------------------------------------------
+## POWERING THE PICO FROM THE HILLS PANEL (no micro-USB)
+## The Hills AUX+ output is 12 V (battery-backed). The Pico CANNOT take 12 V directly
+## (VSYS accepts 1.8-5.5 V only). Use a small 12V->5V buck converter:
+##
+##   Hills AUX+ (12 V, term 14) --> buck IN+
+##   Hills COM  (0 V,  term 15) --> buck IN- / GND
+##   buck OUT+  (set to 5.0 V!)  --> Pico VSYS (pin 39)
+##   buck OUT-                    --> Pico GND  (pin 38, = Hills COM)
+##
+##   - Set/verify the buck to 5.0 V with a meter BEFORE connecting to VSYS.
+##   - A 5V/1A buck (MP1584 / LM2596 module) is ample; Pico 2 W peaks a few hundred mA.
+##   - AUX+ is limited to 500 mA total: Pico (~50 mA in) + 3 PIRs (~60 mA) fits easily.
+##   - If you will also sometimes plug in USB, add a Schottky diode (e.g. SS34) from the
+##     buck 5 V to VSYS to stop back-feeding the USB host. For a permanent no-USB install,
+##     wire straight to VSYS.
+##   - Bonus: because AUX+ is battery-backed, the Pico stays up during a mains outage.
+##
+####
+
+substitutions:
+  ####
+  # NAME
+  name: hills-alarm
+  friendly_name: Hills Alarm
+  project_name: konnected.alarm-panel-hills-r12-pico
+  project_version: "1.0.0"
+
+  ####
+  # BOARD  (rpipico2w = Pico 2 W / RP2350; rpipicow = Pico W / RP2040)
+  rp2040_board: rpipico2w
+
+  blink_on_state: "true"
+  status_led_inverted: "false"
+
+  ####
+  # ZONE MAPPING  (analog inputs = ADC0/1/2). Add a 10K pull-up from each to 3V3.
+  zone1: GPIO26   # ADC0 - Hills ZONE 1
+  zone2: GPIO27   # ADC1 - Hills ZONE 2
+  zone3: GPIO28   # ADC2 - Hills ZONE 3
+  status_led: GPIO64   # onboard CYW43 LED
+
+####
+# PACKAGES
+packages:
+
+  remote_package:
+    url: https://github.com/sanchitd5/konnected-esphome
+    ref: add-rp2040-pico-support
+    refresh: 5min
+    files:
+      # CORE (rp2040/rp2350 base: identity, OTA, uptime, restart)
+      - packages/core-rp2040.yaml
+      # WIFI (serial Improv, no BLE)
+      - packages/wifi.yaml
+      # MDNS (_konnected service advertisement)
+      - packages/mdns.yaml
+      # STATUS LED (onboard CYW43 LED, GPIO64)
+      - packages/status-led.yaml
+
+####
+# ZONE VOLTAGE (diagnostic) - the live divider voltage, handy for retuning thresholds.
+sensor:
+  - platform: adc
+    pin: $zone1
+    id: zone1_v
+    name: "Zone 1 Voltage"
+    update_interval: 100ms
+    accuracy_decimals: 2
+    entity_category: diagnostic
+    filters:
+      - median:
+          window_size: 3
+          send_every: 1
+  - platform: adc
+    pin: $zone2
+    id: zone2_v
+    name: "Zone 2 Voltage"
+    update_interval: 100ms
+    accuracy_decimals: 2
+    entity_category: diagnostic
+    filters:
+      - median:
+          window_size: 3
+          send_every: 1
+  - platform: adc
+    pin: $zone3
+    id: zone3_v
+    name: "Zone 3 Voltage"
+    update_interval: 100ms
+    accuracy_decimals: 2
+    entity_category: diagnostic
+    filters:
+      - median:
+          window_size: 3
+          send_every: 1
+
+####
+# MOTION ZONES
+# Secure ~0.8 V, motion ~1.33 V. ON above 1.15 V, OFF below 1.05 V (hysteresis between).
+# Watch the "Zone N Voltage" sensors and adjust these if your panel's levels differ.
+binary_sensor:
+  - platform: analog_threshold
+    name: "Motion Zone 1"
+    device_class: motion
+    sensor_id: zone1_v
+    threshold:
+      upper: 1.15
+      lower: 1.05
+  - platform: analog_threshold
+    name: "Motion Zone 2"
+    device_class: motion
+    sensor_id: zone2_v
+    threshold:
+      upper: 1.15
+      lower: 1.05
+  - platform: analog_threshold
+    name: "Motion Zone 3"
+    device_class: motion
+    sensor_id: zone3_v
+    threshold:
+      upper: 1.15
+      lower: 1.05
+
+dashboard_import:
+  package_import_url: github://sanchitd5/konnected-esphome/alarm-panel-hills-r12-pico.yaml@add-rp2040-pico-support
+  import_full_config: false
+
+####
+# WEB SERVER
+web_server:
+  include_internal: true
+
+####
+# LOGGER
+logger:
+
+####
+# NATIVE API for HOME ASSISTANT
+# Home Assistant is the brain: zones are exposed as motion binary sensors; arming,
+# entry/exit delay, and siren logic all live in HA (e.g. the alarm_control_panel
+# integration).
+api:

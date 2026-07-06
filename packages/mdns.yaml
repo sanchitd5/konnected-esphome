@@ -25,6 +25,8 @@ mdns:
             "ESP8266"
           #elif defined(USE_ESP32)
             "ESP32"
+          #elif defined(USE_RP2040)
+            "RP2040"
           #endif
           ;
         network: !lambda |-

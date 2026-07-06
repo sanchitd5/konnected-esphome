@@ -1,0 +1,67 @@
+esphome:
+  name: $name
+  friendly_name: $friendly_name
+  name_add_mac_suffix: true
+  # RP2350 (Pico 2 W) support requires ESPHome 2026.3.0+ (arduino-pico 5.x / pico-sdk 2.x).
+  # For the original Pico W (RP2040), any recent ESPHome works.
+  min_version: '2026.3.0'
+  project:
+    name: $project_name
+    version: $project_version
+  on_boot:
+    - priority: 800.0
+      then:
+        - text_sensor.template.publish:
+            id: device_id
+            state: !lambda return get_mac_address();
+        - text_sensor.template.publish:
+            id: project_version
+            state: !lambda return ESPHOME_PROJECT_VERSION;
+
+####
+# PLATFORM
+# The rp2040 platform covers both the RP2040 (Pico W) and RP2350 (Pico 2 W).
+# The board is selected via the ${rp2040_board} substitution:
+#   - rpipico2w  -> Raspberry Pi Pico 2 W  (RP2350)  [default]
+#   - rpipicow   -> Raspberry Pi Pico W    (RP2040)
+# Only boards with the Cypress/Infineon CYW43439 WiFi chip are supported.
+rp2040:
+  board: ${rp2040_board}
+
+substitutions:
+  status_led_inverted: "false"
+
+text_sensor:
+  - platform: template
+    name: Device ID
+    id: device_id
+    entity_category: diagnostic
+    update_interval: never
+  - platform: version
+    id: esphome_version
+    name: ESPHome Version
+    hide_timestamp: true
+  - platform: template
+    name: Project version
+    id: project_version
+    entity_category: diagnostic
+    update_interval: never
+
+sensor:
+  - platform: uptime
+    name: Uptime
+    id: uptime_sensor
+    entity_category: diagnostic
+
+button:
+  - platform: restart
+    name: Restart
+    entity_category: config
+
+####
+# OTA UPDATES
+# Enables over-the-air updates
+# more: https://esphome.io/components/ota.html
+ota:
+  - platform: esphome
+    id: konnected_ota

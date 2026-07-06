@@ -19,6 +19,8 @@ Konnected makes IoT hardware that integrates traditional wired alarm systems and
 | [Garage Door Opener](https://konnected.io/products/smart-garage-door-opener) | GDOv1-S | ESP8266 | WiFi | [`garage-door-GDOv1-S.yaml`](garage-door-GDOv1-S.yaml) |
 | [Garage Door Opener](https://konnected.io/products/smart-garage-door-opener) | GDOv2-S | ESP32-S3 | WiFi | [`garage-door-GDOv2-S.yaml`](garage-door-GDOv2-S.yaml) |
 | [GDO blaQ](https://konnected.io/products/smart-garage-door-opener-blaq-myq-alternative) | GDOv2-Q | ESP32-S3 | WiFi | [`garage-door-GDOv2-Q.yaml`](garage-door-GDOv2-Q.yaml) |
+| Alarm Panel (DIY, 12-zone) | Raspberry Pi Pico 2 W / Pico W | RP2350 / RP2040 | WiFi | [`alarm-panel-pico.yaml`](alarm-panel-pico.yaml) |
+| Alarm Panel (Hills R12 conversion, 3-zone) | Raspberry Pi Pico 2 W / Pico W | RP2350 / RP2040 | WiFi | [`alarm-panel-hills-r12-pico.yaml`](alarm-panel-hills-r12-pico.yaml) |
 
 > **Which Alarm Panel Pro ethernet config?** Check the hardware version printed on the front of the device beneath the logo. Use `alarm-panel-pro-esp32-ethernet.yaml` for v1.5, v1.6, and v1.7. Use `alarm-panel-pro-v1.8-ethernet.yaml` for v1.8 and newer. These are separate config files — no manual variable editing is needed.
 
@@ -77,6 +79,31 @@ Same as above but connected via Ethernet using the **LAN8720** PHY. Use this con
 Alarm Panel Pro **v1.8 and newer** uses the **RTL8201** PHY and requires this dedicated config file. It also applies a `phy_registers` workaround for a known hardware issue in the 2406 production batch. This workaround is harmless on newer batches (2408+).
 
 - **Default packages:** same as above, with RTL8201 Ethernet driver and PHY register fix
+
+---
+
+### Alarm Panel (Raspberry Pi Pico) — `alarm-panel-pico.yaml`
+
+A DIY 12-zone alarm panel that runs on a **Raspberry Pi Pico 2 W (RP2350)** or the original **Pico W (RP2040)**. There is no Konnected PCB for this board; it targets the bare Pico headers, so the GPIO/zone mapping is generic and meant to be edited to match your wiring.
+
+- **Board select:** the `rp2040_board` substitution chooses the target — `rpipico2w` (default, RP2350) or `rpipicow` (RP2040). Both require the CYW43439 WiFi chip.
+- **Toolchain:** RP2350 needs **ESPHome 2026.3.0+** (arduino-pico 5.x / pico-sdk 2.x); the Pico W builds on any recent ESPHome.
+- **Zones:** 12 input zones (`zone1`–`zone12`) + 2 alarm outputs (`alarm1`, `alarm2`) + 2 auxiliary outputs (`out1`, `out2`)
+- **Default packages:** core-rp2040, WiFi (serial Improv, no BLE), mDNS, status LED, zones 1–12, warning beep. Alarm output switches are defined inline (the shared alarm packages use the ESP32-only `ignore_strapping_warning` pin option).
+- **Flashing:** the build produces a **UF2** factory image (drag-and-drop onto the Pico's `RPI-RP2` mass-storage volume); subsequent updates use OTA.
+- **Notes / limitations:** the onboard LED is wired to the CYW43 chip rather than a normal GPIO; arduino-pico exposes it as pin `GPIO64` (`LED_BUILTIN`) on both boards, so `status_led` drives the onboard LED. `GP0`/`GP1` are reserved for the serial console. `captive_portal` and `web_server` on this platform require ESPHome 2026.3.0+.
+
+---
+
+### Alarm Panel (Hills Reliance R12 conversion) — `alarm-panel-hills-r12-pico.yaml`
+
+Converts a **Hills Reliance R12** alarm panel to a Raspberry Pi Pico 2 W (or Pico W), reading the existing wired **PIR motion zones** and handing all arming/siren logic to Home Assistant. Built and field-verified against a real R12; 3 zones by default, trivially extended.
+
+- **Analog zone sensing.** R12 zones are resistive-supervised (they keep a 3.3K EOL and do *not* fully open on alarm), so each zone is read as a voltage divider on an ADC pin rather than a plain GPIO. Add a **10K pull-up from 3V3 to each ADC pin** (`GP26`/`GP27`/`GP28`); the existing zone loop (contact + 3.3K EOL) forms the lower leg to `COM`.
+- **Measured levels:** secure ≈ 0.8V, motion ≈ 1.33V. Firmware fires ON above 1.15V, OFF below 1.05V, with a 3-sample median. A `Zone N Voltage` diagnostic sensor is exposed per zone for retuning.
+- **Ground:** Pico `GND` must bond to Hills `COM`. Never let 12V reach an ADC pin (3.3V max).
+- **Powering from the panel (no USB):** the Hills `AUX+` output is 12V and battery-backed. The Pico cannot take 12V directly (VSYS is 1.8–5.5V), so use a small **12V→5V buck converter**: `AUX+`→buck IN, buck 5V OUT→Pico `VSYS` (pin 39), grounds common on `COM`. The Pico then rides through mains outages on the Hills battery. Full wiring notes are in the config header.
+- **Default packages:** core-rp2040, WiFi (serial Improv, no BLE), mDNS, status LED (onboard GPIO64). Zones are defined inline as ADC + analog-threshold sensors.
 
 ---
 
@@ -305,6 +332,7 @@ This is the recommended way to customize zones. A complete real-world example is
 | `core-esp32.yaml` | Required base for all ESP32 devices: device identity, OTA updates, uptime sensor, restart button. |
 | `core-esp32-s3.yaml` | Same as above, for ESP32-S3. |
 | `core-esp8266.yaml` | Same as above, for ESP8266. |
+| `core-rp2040.yaml` | Same as above, for Raspberry Pi Pico W (RP2040) / Pico 2 W (RP2350); board selected via `rp2040_board`. |
 
 #### Connectivity
 
