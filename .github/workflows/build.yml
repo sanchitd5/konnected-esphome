@@ -13,6 +13,8 @@ jobs:
   build-upload:
     runs-on: ubuntu-latest
     name: Build
+    permissions:
+      contents: write
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -208,8 +210,30 @@ jobs:
           cp $build_path/firmware.ota.bin assets/${fname%.uf2}.ota.bin
           echo "fname=$fname" >> $GITHUB_OUTPUT
 
+      ####
+      # FORK RELEASE
+      # Publish the built Pico firmware (UF2 + OTA bin) as a rolling GitHub
+      # release on this repo, so it can be downloaded without the konnected S3.
+      - name: Publish Pico firmware release
+        if: github.ref == 'refs/heads/add-rp2040-pico-support'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pico-firmware-latest
+          name: Pico firmware (rp2040 / rp2350)
+          body: |
+            Rolling build of the Raspberry Pi Pico alarm-panel firmware from
+            `${{ github.ref_name }}` (${{ github.sha }}).
+
+            Flash the `*.uf2` by holding BOOTSEL and copying it to the RPI-RP2 /
+            RP2350 drive. The `*.ota.bin` is for ESPHome OTA updates.
+          prerelease: true
+          files: |
+            assets/*pico*.uf2
+            assets/*pico*.ota.bin
+
       - uses: keithweaver/aws-s3-github-action@v1.0.0
         name: Upload Builds
+        if: env.AWS_ACCESS_KEY_ID != ''
         with:
           command: cp
           source: assets/
