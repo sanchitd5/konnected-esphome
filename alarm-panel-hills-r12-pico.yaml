@@ -42,6 +42,26 @@
 ##     wire straight to VSYS.
 ##   - Bonus: because AUX+ is battery-backed, the Pico stays up during a mains outage.
 ##
+## -------------------------------------------------------------------------------------
+## SIREN (relay-switched 12 V, controlled from Home Assistant)
+## The Pico can't drive a 12 V siren directly; use a small relay module (or logic-level
+## MOSFET) switching 12 V from AUX+:
+##
+##   Pico GPIO15 (pin 20) --> relay IN
+##   buck 5 V out          --> relay VCC
+##   Pico GND              --> relay GND
+##   Hills AUX+ (12 V)     --> relay COM
+##   relay NO              --> siren +
+##   siren -               --> Hills COM
+##
+##   - The siren must be a self-contained 12 V siren (built-in oscillator). The stock
+##     Hills sounder is often a bare 8 ohm horn SPEAKER (measure it: ~4-8 ohm = speaker)
+##     which is silent on plain 12 V -- replace it with a self-contained siren if so.
+##   - Mind the AUX+ 500 mA budget: Pico (~50 mA) + PIRs (~60 mA) + siren. A typical
+##     piezo siren (150-300 mA) fits; a big horn siren does not.
+##   - Most cheap relay modules are ACTIVE-LOW: if the siren is ON when the switch is
+##     off, set `inverted: true` on the siren switch pin below.
+##
 ####
 
 substitutions:
@@ -64,7 +84,11 @@ substitutions:
   zone1: GPIO26   # ADC0 - Hills ZONE 1
   zone2: GPIO27   # ADC1 - Hills ZONE 2
   zone3: GPIO28   # ADC2 - Hills ZONE 3
+  siren: GPIO15   # relay IN (switches 12 V from AUX+ to the siren)
   status_led: GPIO64   # onboard CYW43 LED
+
+  # Failsafe: siren auto-off after this long, even if HA never sends the off command.
+  siren_max_on_time: 5min
 
 ####
 # PACKAGES
@@ -147,6 +171,24 @@ binary_sensor:
     threshold:
       upper: 1.15
       lower: 1.05
+
+####
+# SIREN
+# GPIO switch driving the relay. Exposed to HA as switch.hills_alarm_siren; the HA
+# alarm_control_panel automation turns it on when triggered. Auto-off failsafe below
+# guards against HA dying mid-alarm. restore_mode keeps it OFF across reboots.
+switch:
+  - platform: gpio
+    id: siren_switch
+    name: Siren
+    icon: mdi:bullhorn
+    pin:
+      number: $siren
+      # inverted: true   # uncomment for active-low relay modules
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - delay: $siren_max_on_time
+      - switch.turn_off: siren_switch
 
 dashboard_import:
   package_import_url: github://sanchitd5/konnected-esphome/alarm-panel-hills-r12-pico.yaml@add-rp2040-pico-support
